@@ -14,7 +14,11 @@ Community guides bypass the game's launcher by setting Steam launch options to p
 
 ## The fix
 
-**Graphics**: Install DXMT v0.80 into the GPTK Wine environment (automated by `install.sh`).
+**Graphics (Wine 11 stack)**: Run `bash ~/Games/steam-on-m1-wine/scripts/04-install-dxmt.sh`, then `bash scripts/patch-winemac.sh`. UE5 may still crash until the **DXMT fork** is built (~30–60 min once):
+
+```bash
+bash ~/Games/steam-on-m1-wine/scripts/07-build-dxmt-fork.sh
+```
 
 **Auth**: Launch through **Steam's process chain**, not the .exe:
 
@@ -76,7 +80,8 @@ You can also click **Play** inside Steam's library — just don't set launch opt
 | Script | Purpose |
 |--------|---------|
 | `install.sh` | Full setup: GPTK 3.0-3, DXMT v0.80, Wine prefix, VC++/DirectX deps |
-| `scripts/launch-meccha.sh` | **Primary fix** — `steam.exe -applaunch 4704690 -dx11` |
+| `scripts/launch-meccha.sh` | **Primary fix** — Steam applaunch with DXMT + winemac checks |
+| `scripts/patch-winemac.sh` | Rebuild Wine 11 `winemac.so` for DXMT Metal views |
 | `scripts/install-meccha-app.sh` | Create `~/Applications/MECCHA CHAMELEON.app` for Dock |
 | `scripts/launch-steam.sh` | Open Windows Steam for install / updates |
 | `scripts/setup-dxmt.sh` | Install/revert DXMT (D3D11→Metal) in GPTK |
