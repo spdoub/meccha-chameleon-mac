@@ -35,19 +35,19 @@ Steam stays parent of the game process, injects `steam_api64.dll`, and EOS recei
 
 ## Quick start
 
+**Steam uses Wine 11** (GPTK Wine 7.7 cannot boot the 2026 Steam client). Game auth still uses `steam.exe -applaunch`.
+
 ```bash
 cd ~/Games/meccha-chameleon-gptk
+git clone https://github.com/spdoub/meccha-chameleon-mac.git .  # if fresh
 
-# Full install: GPTK + DXMT + Wine prefix + VC++/DirectX deps + Steam
-bash install.sh
-
-# Open Steam, log in, install MECCHA CHAMELEON
+# One-time: Wine 11 + Steam wrapper (auto-clones notpop/steam-on-m1-wine)
 bash scripts/launch-steam.sh
 
-# Clear any direct-exe launch bypass from other guides
-bash scripts/clear-launch-options.sh --fix --set "-dx11"
+# Or click: ~/Applications/Steam on M1 Wine.app
+# Log in, install MECCHA CHAMELEON from your library
 
-# Play (correct launch path — keeps auth intact)
+bash scripts/clear-launch-options.sh --fix --set "-dx11"
 bash scripts/launch-meccha.sh
 ```
 
