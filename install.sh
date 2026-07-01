@@ -180,9 +180,9 @@ fi
 step "8/8 Configure and verify"
 chmod +x "$ROOT"/scripts/*.sh "$ROOT"/cleanup.sh 2>/dev/null || true
 
-# Apply steam_api64 DLL overrides.
-bash "$ROOT/scripts/fix-steam-api-overrides.sh" >>"$LOG" 2>&1 || true
-ok "steam_api64 overrides applied"
+# Apply Steam + auth Wine overrides.
+bash "$ROOT/scripts/fix-steam-wine-overrides.sh" >>"$LOG" 2>&1 || true
+ok "Steam Wine overrides applied"
 
 # Verify Wine can execute.
 WINEVER=$(run_in_x86 env WINEPREFIX="$WINEPREFIX" "$WINE" --version 2>/dev/null || echo "unknown")

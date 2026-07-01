@@ -37,9 +37,10 @@ export MTL_HUD_ENABLED="${MTL_HUD_ENABLED:-0}"
 export WINEESYNC="${WINEESYNC:-1}"
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-}"
 
-# DXMT: prefix-local install (does NOT patch global GPTK — Steam needs D3DMetal).
+# DXMT: prefix-local install; winemetal.so staged in .cache (never global during Steam).
+DXMT_STORE="${PROJECT_ROOT}/.cache/dxmt-installed"
 DXMT_MARKER="$WINEPREFIX/drive_c/windows/system32/d3d11.dll"
-if [[ -f "$DXMT_MARKER" ]] && [[ -f "$GPTK_WINE_DIR/lib/wine/x86_64-unix/winemetal.so" ]]; then
+if [[ -f "$DXMT_MARKER" ]] && [[ -f "$DXMT_STORE/winemetal.so" ]]; then
   export DXMT_INSTALLED=1
 else
   export DXMT_INSTALLED=0
@@ -47,6 +48,21 @@ fi
 
 # DXMT overrides — only applied for game launch, not Steam.
 export DXMT_OVERRIDES="dxgi,d3d11,d3d10core=n,b"
+
+# Required for Steam's CEF UI on Wine/GPTK (prevents webhelper crash loop).
+# See winetricks bug 49839 workaround on macOS.
+export STEAM_CEF_ARGS="${STEAM_CEF_ARGS:--allosarches -cef-force-32bit -cef-in-process-gpu -cef-disable-sandbox}"
+
+enable_dxmt_runtime() {
+  # Temporarily install winemetal.so for DXMT game sessions only.
+  [[ "$DXMT_INSTALLED" == "1" ]] || return 0
+  local dest="$GPTK_WINE_DIR/lib/wine/x86_64-unix/winemetal.so"
+  cp "$DXMT_STORE/winemetal.so" "$dest"
+}
+
+disable_dxmt_runtime() {
+  rm -f "$GPTK_WINE_DIR/lib/wine/x86_64-unix/winemetal.so" 2>/dev/null || true
+}
 
 require_gptk() {
   if [[ ! -x "$WINE" ]]; then
@@ -93,6 +109,9 @@ run_wine() {
 
 run_steam() {
   require_steam
+  disable_dxmt_runtime
+  # shellcheck disable=SC2206
+  local cef_args=( $STEAM_CEF_ARGS )
   # Steam must use D3DMetal — never pass DXMT overrides here.
   run_in_x86 env \
     WINEPREFIX="$WINEPREFIX" \
@@ -100,22 +119,28 @@ run_steam() {
     MTL_HUD_ENABLED="${MTL_HUD_ENABLED:-0}" \
     WINEDEBUG="${WINEDEBUG:--all}" \
     WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-}" \
-    "$WINE" "$STEAM_EXE_UNIX" "$@"
+    "$WINE" "$STEAM_EXE_UNIX" "${cef_args[@]}" "$@"
 }
 
 run_game() {
   require_steam
   local overrides="${WINEDLLOVERRIDES:-}"
   if [[ "$DXMT_INSTALLED" == "1" ]]; then
+    enable_dxmt_runtime
     overrides="${DXMT_OVERRIDES}${overrides:+;$overrides}"
   fi
+  # shellcheck disable=SC2206
+  local cef_args=( $STEAM_CEF_ARGS )
   run_in_x86 env \
     WINEPREFIX="$WINEPREFIX" \
     WINEESYNC="${WINEESYNC:-1}" \
     MTL_HUD_ENABLED="${MTL_HUD_ENABLED:-0}" \
     WINEDEBUG="${WINEDEBUG:--all}" \
     WINEDLLOVERRIDES="$overrides" \
-    "$WINE" "$STEAM_EXE_UNIX" "$@"
+    "$WINE" "$STEAM_EXE_UNIX" "${cef_args[@]}" "$@"
+  local exit_code=$?
+  disable_dxmt_runtime
+  return "$exit_code"
 }
 
 game_installed() {

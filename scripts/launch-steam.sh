@@ -7,6 +7,8 @@ export PROJECT_ROOT="$ROOT"
 # shellcheck source=common.sh
 source "$ROOT/scripts/common.sh"
 
+STEAM_LOG="$LOG_DIR/steam-launch.log"
+
 echo "==> Starting Windows Steam"
 echo "    Prefix: $WINEPREFIX"
 echo ""
@@ -40,9 +42,15 @@ fi
 
 echo "Launching Steam (first open can take 2–5 minutes)..."
 echo ""
-echo "  • The terminal will show Wine messages — that's normal, ignore them."
+echo "  • Wine debug output goes to: $STEAM_LOG"
 echo "  • Check your Dock for a Steam or Wine icon and click it."
 echo "  • If no window after 5 min, press Ctrl+C and run this script again."
 echo ""
 
-run_steam "$@"
+{
+  echo "# Steam launch — $(date -Iseconds)"
+  echo "# Args: $STEAM_CEF_ARGS"
+  echo ""
+} >>"$STEAM_LOG"
+
+run_steam "$@" >>"$STEAM_LOG" 2>&1

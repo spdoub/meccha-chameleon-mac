@@ -60,6 +60,7 @@ bash scripts/launch-meccha.sh
 | `scripts/launch-steam.sh` | Open Windows Steam for install / updates |
 | `scripts/setup-dxmt.sh` | Install/revert DXMT (D3D11→Metal) in GPTK |
 | `scripts/clear-launch-options.sh` | Detect/remove Shipping.exe bypass in Steam VDF |
+| `scripts/fix-steam-wine-overrides.sh` | Steam CEF + libglesv2 Wine registry fixes |
 | `scripts/fix-steam-api-overrides.sh` | Set `steam_api64=n,b` DLL override |
 | `scripts/debug-auth.sh` | Wine debug log for auth/EOS failures |
 | `cleanup.sh` | Remove everything this project installed |
@@ -114,6 +115,16 @@ bash scripts/setup-dxmt.sh --undo
 # Re-install DXMT
 bash scripts/setup-dxmt.sh
 ```
+
+## Steam UI troubleshooting
+
+If `launch-steam.sh` runs but no window appears (only Wine text in the terminal):
+
+1. **This is normal noise** — Wine debug output is redirected to `logs/steam-launch.log`. Ignore the terminal.
+2. **Wait 3–5 minutes** on first launch. Check the **Dock** for a Steam or Wine icon and click it.
+3. **Avoid display mirroring** — Steam on Wine crashes when macOS is mirroring to an external display.
+4. **Run overrides** — `bash scripts/fix-steam-wine-overrides.sh`
+5. **GPTK limitation** — GPTK 3.0-3 bundles Wine 7.7, which may not fully support the latest Steam client UI. If Steam never appears after 5 minutes, install Steam via [Sikarugir](https://github.com/nothinglo/meccha-chameleon-mac) or Whisky, install MECCHA CHAMELEON there, then use our `launch-meccha.sh` applaunch fix in that prefix (set `WINEPREFIX` accordingly).
 
 ## What not to do
 
