@@ -32,6 +32,9 @@ if [[ -n "$TARBALL" && -f "$TARBALL" ]]; then
   echo "Extracting prefix (~1–3 min)..."
   tar -xzf "$TARBALL" -C "$HOME"
   echo "Prefix restored to $WINEPREFIX"
+  echo ""
+  echo "Note: wine-steam.tgz restores Steam + the game, not the DXMT fork in Wine.app."
+  echo "      You still need Xcode +: bash scripts/build-dxmt-fork.sh"
   bash "$ROOT/install.sh"
 else
   echo "No wine-steam.tgz found — running full install."

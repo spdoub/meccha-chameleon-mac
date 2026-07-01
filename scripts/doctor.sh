@@ -39,15 +39,21 @@ if (( wow64 >= 100 )); then pass "WoW64 syswow64: $wow64 files"; else fail "WoW6
 # DXMT fork
 d3d="$WINE_APP/Contents/Resources/wine/lib/wine/x86_64-windows/d3d11.dll"
 winemac="$WINE_APP/Contents/Resources/wine/lib/wine/x86_64-unix/winemac.so"
-if [[ -f "$ROOT/.dxmt-fork-built" ]]; then
+if meccha_dxmt_fork_ready "$ROOT" "$WINE_APP"; then
   sz=$(stat -f%z "$d3d" 2>/dev/null || echo 0)
-  if (( sz >= 15000000 )) && nm -gU "$winemac" 2>/dev/null | grep -q macdrv_view_create_metal_view; then
-    pass "DXMT fork installed (${sz} byte d3d11.dll)"
+  pass "DXMT fork installed (${sz} byte d3d11.dll)"
+elif [[ -f "$GAME_EXE" ]]; then
+  fail "DXMT fork missing — game will crash on D3D11 startup"
+  if meccha_has_xcode; then
+    echo "       Run: bash scripts/build-dxmt-fork.sh  (~30–60 min)"
   else
-    fail "DXMT fork missing — bash scripts/build-dxmt-fork.sh"
+    echo "       Install Xcode from the App Store, then: bash scripts/build-dxmt-fork.sh"
+    echo "       (Command Line Tools alone cannot compile the Metal shader compiler.)"
   fi
+elif [[ -f "$ROOT/.dxmt-fork-built" ]]; then
+  fail "DXMT fork missing — bash scripts/build-dxmt-fork.sh"
 else
-  warn "DXMT fork not built — bash scripts/build-dxmt-fork.sh"
+  warn "DXMT fork not built — required before playing"
 fi
 
 # Game

@@ -77,3 +77,6 @@ fi
 # shellcheck source=meccha-common.sh
 source "$ROOT/scripts/meccha-common.sh"
 meccha_check_wine_version || true
+
+# Game is installed but graphics fork missing → fail fast with a clear message.
+meccha_require_dxmt_for_play "$ROOT" "$GAME_EXE" || exit 1

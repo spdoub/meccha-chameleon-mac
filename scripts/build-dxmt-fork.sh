@@ -10,6 +10,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=wine11-env.sh
 source "$ROOT/scripts/wine11-env.sh"
+# shellcheck source=meccha-common.sh
+source "$ROOT/scripts/meccha-common.sh"
 
 PATCH_DIR="$ROOT/patches"
 LLVM_PREFIX="$DXMT_SRC/toolchains/llvm"
@@ -21,6 +23,10 @@ ok(){ printf '\033[32m✓ %s\033[0m\n' "$*"; }
 die(){ printf '\033[31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 
 [[ -x "$WINE_BIN" ]] || die "Wine 11 not found at $WINE_BIN — run install.sh first."
+
+if ! meccha_has_xcode; then
+  die "Full Xcode required (App Store). Command Line Tools alone cannot build the DXMT Metal shader compiler."
+fi
 
 if [[ -f "$MARKER" ]] && [[ -f "$WINE_APP/Contents/Resources/wine/lib/wine/x86_64-windows/d3d11.dll" ]]; then
   sz=$(stat -f%z "$WINE_APP/Contents/Resources/wine/lib/wine/x86_64-windows/d3d11.dll" 2>/dev/null || echo 0)

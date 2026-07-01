@@ -36,6 +36,49 @@ meccha_kill_prefix() {
   fi
 }
 
+meccha_kill_stale_launchers() {
+  local self="${1:-$$}"
+  local pid
+  while IFS= read -r pid; do
+    [[ -z "$pid" || "$pid" == "$self" ]] && continue
+    /bin/kill -9 "$pid" 2>/dev/null || true
+  done < <(/usr/bin/pgrep -f 'scripts/launch-meccha\.sh' 2>/dev/null || true)
+}
+
+meccha_purge_steam_locks() {
+  local htmlcache="${1:-}"
+  [[ -n "$htmlcache" && -d "$htmlcache" ]] || return 0
+  find "$htmlcache" -maxdepth 3 \
+    \( -name 'Singleton*' -o -name '*.lock' -o -name 'CrashpadMetrics*.pma' -o -name 'lockfile' \) \
+    -delete 2>/dev/null || true
+}
+
+# macOS has no flock(1) — use an atomic mkdir lock directory.
+meccha_acquire_launch_lock() {
+  local lock_dir="${1:-}"
+  [[ -n "$lock_dir" ]] || return 1
+  if mkdir "$lock_dir" 2>/dev/null; then
+    echo "$$" >"$lock_dir/pid"
+    return 0
+  fi
+  if [[ -f "$lock_dir/pid" ]]; then
+    local old_pid
+    old_pid=$(/bin/cat "$lock_dir/pid" 2>/dev/null || true)
+    if [[ -n "$old_pid" ]] && ! /bin/kill -0 "$old_pid" 2>/dev/null; then
+      /bin/rm -rf "$lock_dir"
+      mkdir "$lock_dir" 2>/dev/null || return 1
+      echo "$$" >"$lock_dir/pid"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+meccha_release_launch_lock() {
+  local lock_dir="${1:-}"
+  [[ -n "$lock_dir" ]] && /bin/rm -rf "$lock_dir"
+}
+
 meccha_build_game_flags() {
   local flags="${GAME_FLAGS:--dx11 -force-d3d11-no-singlethreaded}"
   if [[ "${MECCHA_FULLSCREEN:-0}" == "1" ]]; then
@@ -132,4 +175,38 @@ meccha_check_wine_version() {
     return 1
   fi
   return 0
+}
+
+meccha_has_xcode() {
+  [[ -d /Applications/Xcode.app ]] && /usr/bin/xcodebuild -version >/dev/null 2>&1
+}
+
+meccha_dxmt_fork_ready() {
+  local root="${1:-$PROJECT_ROOT}"
+  local wine_app="${2:-$WINE_APP}"
+  local d3d="$wine_app/Contents/Resources/wine/lib/wine/x86_64-windows/d3d11.dll"
+  local winemac="$wine_app/Contents/Resources/wine/lib/wine/x86_64-unix/winemac.so"
+  [[ -f "$root/.dxmt-fork-built" ]] || return 1
+  local sz
+  sz=$(stat -f%z "$d3d" 2>/dev/null || echo 0)
+  (( sz >= 15000000 )) || return 1
+  nm -gU "$winemac" 2>/dev/null | grep -q macdrv_view_create_metal_view
+}
+
+meccha_require_dxmt_for_play() {
+  local root="${1:-$PROJECT_ROOT}"
+  local game_exe="${2:-}"
+  [[ -n "$game_exe" && -f "$game_exe" ]] || return 0
+  if meccha_dxmt_fork_ready "$root" "$WINE_APP"; then
+    return 0
+  fi
+  if meccha_has_xcode; then
+    echo "DXMT fork not built — UE5 will crash on launch." >&2
+    echo "Run: bash scripts/build-dxmt-fork.sh  (~30–60 min, one time)" >&2
+  else
+    echo "Cannot play yet — the DXMT graphics fork must be compiled on this Mac." >&2
+    echo "Install full Xcode from the App Store (Command Line Tools alone is not enough)," >&2
+    echo "then run: bash scripts/build-dxmt-fork.sh" >&2
+  fi
+  return 1
 }
