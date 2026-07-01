@@ -61,7 +61,8 @@ bash scripts/build-dxmt-fork.sh
 | `scripts/add-meccha-to-dock.sh` | Pin game icon to Dock |
 | `scripts/install-prefix-deps.sh` | VC++ / fonts in Wine prefix |
 | `scripts/clear-launch-options.sh` | Remove Shipping.exe bypass in Steam VDF |
-| `scripts/debug-auth.sh` | Auth/EOS debug logging |
+| `scripts/preflight-launch.sh` | Idle-week recovery (locks, wrapper, DXMT, WoW64) |
+| `scripts/fix-wow64-steam.sh` | Diagnose/repair empty `syswow64` (Steam `kernel32.dll` errors) |
 | `scripts/legacy-install-gptk.sh` | Old GPTK 7.7 path (deprecated) |
 
 ## Requirements
@@ -85,11 +86,13 @@ bash scripts/build-dxmt-fork.sh
 
 | Symptom | Fix |
 |---------|-----|
+| `kernel32.dll` / empty `syswow64` / SteamSetup fails | `bash scripts/fix-wow64-steam.sh` then `--fix` if needed |
 | Icon flashes and exits | Run `bash scripts/build-dxmt-fork.sh` |
 | D3D11 GPU required | Run `bash scripts/patch-winemac.sh` then `build-dxmt-fork.sh` |
 | VC++ redistributable error | `bash scripts/install-prefix-deps.sh` |
 | Auth token error | Use Dock app / `launch-meccha.sh`, not direct `.exe` |
 | No Dock icon | `bash scripts/add-meccha-to-dock.sh` |
+| Broken after a week idle / Wine upgrade | Just click the Dock app — preflight runs automatically; or `bash scripts/preflight-launch.sh` |
 
 Logs: `~/Games/meccha-chameleon-gptk/logs/`
 

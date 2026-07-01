@@ -5,7 +5,18 @@
 : "${HOME:=$(eval echo ~)}"
 : "${PROJECT_ROOT:=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 : "${NOTPOP:=${NOTPOP:-$HOME/Games/steam-on-m1-wine}}"
-: "${WINE_APP:=${WINE_APP:-$HOME/Applications/Wine Stable.app}}"
+
+# Homebrew installs wine-stable to /Applications; DXMT patches use ~/Applications.
+# Resolve whichever exists, preferring the user-local copy.
+if [[ -z "${WINE_APP:-}" ]]; then
+  if [[ -x "$HOME/Applications/Wine Stable.app/Contents/Resources/wine/bin/wine" ]]; then
+    WINE_APP="$HOME/Applications/Wine Stable.app"
+  elif [[ -x "/Applications/Wine Stable.app/Contents/Resources/wine/bin/wine" ]]; then
+    WINE_APP="/Applications/Wine Stable.app"
+  else
+    WINE_APP="$HOME/Applications/Wine Stable.app"
+  fi
+fi
 : "${WINE_BIN:=$WINE_APP/Contents/Resources/wine/bin/wine}"
 : "${WINESERVER:=$WINE_APP/Contents/Resources/wine/bin/wineserver}"
 : "${WINEPREFIX:=${WINEPREFIX:-$HOME/.wine-steam}}"

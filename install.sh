@@ -51,7 +51,15 @@ done
 # --- 2. notpop/steam-on-m1-wine (Wine 11 + Steam bootstrap) ---
 step "Wine 11 + Steam stack (notpop/steam-on-m1-wine)"
 ensure_notpop
-export WINE_APP INSTALL_APP_DIR WINEPREFIX
+export WINE_APP INSTALL_APP_DIR WINEPREFIX WINEARCH=win64
+
+# Homebrew cask lands in /Applications; our stack expects ~/Applications for patches.
+if [[ -d "/Applications/Wine Stable.app" && ! -e "$HOME/Applications/Wine Stable.app" ]]; then
+  mkdir -p "$HOME/Applications"
+  ln -sf "/Applications/Wine Stable.app" "$HOME/Applications/Wine Stable.app"
+  export WINE_APP="$HOME/Applications/Wine Stable.app"
+  ok "Linked Wine Stable.app → /Applications"
+fi
 
 NOTPOP_STEPS=(
   scripts/00-prereqs.sh
@@ -69,7 +77,12 @@ NOTPOP_STEPS+=(
 
 for s in "${NOTPOP_STEPS[@]}"; do
   step "$(basename "$s")"
-  bash "$NOTPOP/$s" || die "$s failed"
+  bash "$NOTPOP/$s" || {
+    if [[ "$(basename "$s")" == "03-install-steam.sh" ]]; then
+      die "$s failed — 32-bit WoW64 is often the cause. Run: bash scripts/fix-wow64-steam.sh"
+    fi
+    die "$s failed"
+  }
 done
 ok "Steam stack ready at $WINEPREFIX"
 

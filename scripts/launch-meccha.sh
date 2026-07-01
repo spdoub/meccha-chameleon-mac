@@ -11,6 +11,9 @@ source "$ROOT/scripts/wine11-env.sh"
 
 APP_ID="${APP_ID:-4704690}"
 NOTPOP="$NOTPOP"
+
+# Recover from idle weeks, Wine upgrades, stale locks, broken WoW64.
+bash "$ROOT/scripts/preflight-launch.sh"
 # UE5 on DXMT: windowed + avoid D3D11 single-threaded device path (steam-on-m1-wine).
 GAME_FLAGS="${GAME_FLAGS:--dx11 -force-d3d11-no-singlethreaded -screen-fullscreen 0}"
 
@@ -25,12 +28,7 @@ if [[ ! -f "$GAME_EXE" ]]; then
   exit 1
 fi
 
-# Ensure wrapper is deployed.
-if [[ -x "$NOTPOP/scripts/06-install-wrapper.sh" ]]; then
-  bash "$NOTPOP/scripts/06-install-wrapper.sh" >/dev/null 2>&1 || true
-fi
-
-# DXMT (D3D11→Metal) — required for UE5's Feature Level 11.0 check.
+# DXMT (D3D11→Metal) — first-time install only; preflight handles rebuild after upgrades.
 WINEMETAL_SO="$WINE_APP/Contents/Resources/wine/lib/wine/x86_64-unix/winemetal.so"
 WINEMAC_SO="$WINE_APP/Contents/Resources/wine/lib/wine/x86_64-unix/winemac.so"
 if [[ ! -f "$WINEMETAL_SO" ]] && [[ -x "$NOTPOP/scripts/04-install-dxmt.sh" ]]; then
@@ -55,21 +53,35 @@ export WINEESYNC=0
 export WINEFSYNC=0
 export WINEDLLOVERRIDES="dxgi,d3d11,d3d10core=n,b;bcrypt=b;ncrypt=b;gameoverlayrenderer,gameoverlayrenderer64=d;steam_api64=n,b"
 
+# Stale / duplicate Steam sessions leave applaunch hanging with no window.
+if [[ "${MECCHA_NO_KILL:-0}" != "1" ]]; then
+  patterns='steam\.exe|steamwebhelper|steamservice|wineserver|wine64-preloader|winedevice|explorer\.exe'
+  to_kill=$(pgrep -f "$patterns" 2>/dev/null || true)
+  if [[ -n "$to_kill" ]]; then
+    echo "Stopping stale Wine/Steam processes..."
+    # shellcheck disable=SC2086
+    kill -9 $to_kill 2>/dev/null || true
+    sleep 2
+  fi
+fi
+
 steam_running() {
   pgrep -f "Steam/Steam.exe|Steam\\\\Steam.exe" >/dev/null 2>&1 \
     || pgrep -f "Steam.exe" >/dev/null 2>&1
 }
 
 if ! steam_running; then
-  echo "Starting Steam (Wine 11)..."
-  bash "$NOTPOP/scripts/launch-steam.sh" --detach
-  for _ in $(seq 1 45); do
-    steam_running && break
-    sleep 2
-  done
-  steam_running || { echo "Steam did not start — check ~/Applications/Steam on M1 Wine.app" >&2; exit 1; }
-  sleep 5
+  echo "Starting Steam (Wine 11 + virtual desktop)..."
+else
+  echo "Restarting Steam for a clean game launch..."
 fi
+bash "$NOTPOP/scripts/launch-steam.sh" --detach
+for _ in $(seq 1 45); do
+  steam_running && break
+  sleep 2
+done
+steam_running || { echo "Steam did not start — check ~/Applications/Steam on M1 Wine.app" >&2; exit 1; }
+sleep 8
 
 echo "Launching MECCHA CHAMELEON via steam.exe -applaunch $APP_ID"
 echo "  Game flags: $GAME_FLAGS"
@@ -77,7 +89,7 @@ echo "  Game flags: $GAME_FLAGS"
 cd "$STEAM_DIR"
 # IMPORTANT: Do NOT pass -cef-* / -noverifyfiles here — Steam forwards them to the game
 # and UE5 aborts (see crash CommandLine in AppData/Local/Chameleon/Saved/Crashes).
-exec /usr/bin/arch -x86_64 env \
+/usr/bin/arch -x86_64 env \
   WINEPREFIX="$WINEPREFIX" \
   WINEESYNC=0 \
   WINEFSYNC=0 \
@@ -85,3 +97,23 @@ exec /usr/bin/arch -x86_64 env \
   WINEDLLOVERRIDES="$WINEDLLOVERRIDES" \
   "$WINE_BIN" "C:\\Program Files (x86)\\Steam\\Steam.exe" \
   -applaunch "$APP_ID" $GAME_FLAGS
+
+# Applaunch returns once Steam accepts the job; focus the Wine desktop window.
+for _ in $(seq 1 30); do
+  pgrep -f 'PenguinHotel-Win64-Shipping' >/dev/null 2>&1 && break
+  sleep 1
+done
+/usr/bin/osascript <<'APPLESCRIPT' 2>/dev/null || true
+tell application "System Events"
+  repeat with p in (every process whose name contains "wine")
+    try
+      set frontmost of p to true
+      repeat with w in (every window of p)
+        try
+          perform action "AXRaise" of w
+        end try
+      end repeat
+    end try
+  end repeat
+end tell
+APPLESCRIPT
