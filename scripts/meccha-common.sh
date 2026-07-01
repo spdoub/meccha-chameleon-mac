@@ -26,14 +26,13 @@ meccha_kill_prefix() {
     WINEPREFIX="$prefix" "$wineserver" -k 2>/dev/null || true
     sleep 2
   fi
-  if /usr/bin/pgrep -f 'steam\.exe|steamwebhelper|wineserver' >/dev/null 2>&1; then
-    local to_kill
-    to_kill=$(/usr/bin/pgrep -f 'steam\.exe|steamwebhelper|steamservice|winedevice|explorer\.exe|wine64-preloader' 2>/dev/null || true)
-    if [[ -n "$to_kill" ]]; then
-      # shellcheck disable=SC2086
-      /bin/kill -9 $to_kill 2>/dev/null || true
-      sleep 1
-    fi
+  local patterns='steam\.exe|steamwebhelper|steamservice|wineserver|wine64-preloader|winedevice|explorer\.exe'
+  local to_kill
+  to_kill=$(/usr/bin/pgrep -f "$patterns" 2>/dev/null || true)
+  if [[ -n "$to_kill" ]]; then
+    # shellcheck disable=SC2086
+    /bin/kill -9 $to_kill 2>/dev/null || true
+    sleep 2
   fi
 }
 
