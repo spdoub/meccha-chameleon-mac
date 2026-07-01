@@ -48,8 +48,28 @@ bash scripts/launch-steam.sh
 # Log in, install MECCHA CHAMELEON from your library
 
 bash scripts/clear-launch-options.sh --fix --set "-dx11"
-bash scripts/launch-meccha.sh
+bash scripts/install-meccha-app.sh   # Dock icon for one-click play
+bash scripts/launch-meccha.sh        # or click the Dock icon
 ```
+
+## Play from the Dock
+
+After installing the game in Steam:
+
+| Dock app | What it does |
+|----------|----------------|
+| **Steam on M1 Wine** | Opens Steam (install games, log in) |
+| **MECCHA CHAMELEON** | Launches the game via `steam.exe -applaunch 4704690` (keeps online auth working) |
+
+Install the game launcher:
+
+```bash
+bash scripts/install-meccha-app.sh
+```
+
+Then drag **MECCHA CHAMELEON** from `~/Applications` onto your Dock. First launch can take ~3 minutes.
+
+You can also click **Play** inside Steam's library — just don't set launch options to `PenguinHotel-Win64-Shipping.exe`.
 
 ## Scripts
 
@@ -57,6 +77,7 @@ bash scripts/launch-meccha.sh
 |--------|---------|
 | `install.sh` | Full setup: GPTK 3.0-3, DXMT v0.80, Wine prefix, VC++/DirectX deps |
 | `scripts/launch-meccha.sh` | **Primary fix** — `steam.exe -applaunch 4704690 -dx11` |
+| `scripts/install-meccha-app.sh` | Create `~/Applications/MECCHA CHAMELEON.app` for Dock |
 | `scripts/launch-steam.sh` | Open Windows Steam for install / updates |
 | `scripts/setup-dxmt.sh` | Install/revert DXMT (D3D11→Metal) in GPTK |
 | `scripts/clear-launch-options.sh` | Detect/remove Shipping.exe bypass in Steam VDF |
@@ -124,7 +145,7 @@ If `launch-steam.sh` runs but no window appears (only Wine text in the terminal)
 2. **Wait 3–5 minutes** on first launch. Check the **Dock** for a Steam or Wine icon and click it.
 3. **Avoid display mirroring** — Steam on Wine crashes when macOS is mirroring to an external display.
 4. **Run overrides** — `bash scripts/fix-steam-wine-overrides.sh`
-5. **GPTK limitation** — GPTK 3.0-3 bundles Wine 7.7, which may not fully support the latest Steam client UI. If Steam never appears after 5 minutes, install Steam via [Sikarugir](https://github.com/nothinglo/meccha-chameleon-mac) or Whisky, install MECCHA CHAMELEON there, then use our `launch-meccha.sh` applaunch fix in that prefix (set `WINEPREFIX` accordingly).
+5. **Use Wine 11** — GPTK Wine 7.7 cannot boot the 2026 Steam client. `launch-steam.sh` auto-clones [notpop/steam-on-m1-wine](https://github.com/notpop/steam-on-m1-wine) and installs **Steam on M1 Wine.app**.
 
 ## What not to do
 
