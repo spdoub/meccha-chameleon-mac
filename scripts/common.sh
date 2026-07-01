@@ -37,13 +37,16 @@ export MTL_HUD_ENABLED="${MTL_HUD_ENABLED:-0}"
 export WINEESYNC="${WINEESYNC:-1}"
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-}"
 
-# DXMT: if installed in the prefix, override d3d11/dxgi to use DXMT's builtin DLLs.
-DXMT_MARKER="$GPTK_WINE_DIR/lib/wine/x86_64-unix/winemetal.so"
-if [[ -f "$DXMT_MARKER" ]]; then
+# DXMT: prefix-local install (does NOT patch global GPTK — Steam needs D3DMetal).
+DXMT_MARKER="$WINEPREFIX/drive_c/windows/system32/d3d11.dll"
+if [[ -f "$DXMT_MARKER" ]] && [[ -f "$GPTK_WINE_DIR/lib/wine/x86_64-unix/winemetal.so" ]]; then
   export DXMT_INSTALLED=1
 else
   export DXMT_INSTALLED=0
 fi
+
+# DXMT overrides — only applied for game launch, not Steam.
+export DXMT_OVERRIDES="dxgi,d3d11,d3d10core=n,b"
 
 require_gptk() {
   if [[ ! -x "$WINE" ]]; then
@@ -90,7 +93,29 @@ run_wine() {
 
 run_steam() {
   require_steam
-  run_wine "$STEAM_EXE_UNIX" "$@"
+  # Steam must use D3DMetal — never pass DXMT overrides here.
+  run_in_x86 env \
+    WINEPREFIX="$WINEPREFIX" \
+    WINEESYNC="${WINEESYNC:-1}" \
+    MTL_HUD_ENABLED="${MTL_HUD_ENABLED:-0}" \
+    WINEDEBUG="${WINEDEBUG:--all}" \
+    WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-}" \
+    "$WINE" "$STEAM_EXE_UNIX" "$@"
+}
+
+run_game() {
+  require_steam
+  local overrides="${WINEDLLOVERRIDES:-}"
+  if [[ "$DXMT_INSTALLED" == "1" ]]; then
+    overrides="${DXMT_OVERRIDES}${overrides:+;$overrides}"
+  fi
+  run_in_x86 env \
+    WINEPREFIX="$WINEPREFIX" \
+    WINEESYNC="${WINEESYNC:-1}" \
+    MTL_HUD_ENABLED="${MTL_HUD_ENABLED:-0}" \
+    WINEDEBUG="${WINEDEBUG:--all}" \
+    WINEDLLOVERRIDES="$overrides" \
+    "$WINE" "$STEAM_EXE_UNIX" "$@"
 }
 
 game_installed() {

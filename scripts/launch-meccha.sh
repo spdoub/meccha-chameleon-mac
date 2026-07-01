@@ -57,4 +57,4 @@ echo "Steam will start (if not running), authenticate, then spawn the game."
 echo "First launch can take several minutes under Rosetta + Wine."
 echo ""
 
-run_steam "${STEAM_ARGS[@]}"
+run_game "${STEAM_ARGS[@]}"

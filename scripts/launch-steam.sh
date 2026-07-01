@@ -30,4 +30,19 @@ if [[ ! -f "$STEAM_EXE_UNIX" ]]; then
   exit 0
 fi
 
+# Kill any stuck Steam from a previous crash-loop.
+if pgrep -f "steam.exe" >/dev/null 2>&1; then
+  echo "Stopping previous Steam instance..."
+  pkill -f "steam.exe|steamwebhelper" 2>/dev/null || true
+  run_in_x86 env WINEPREFIX="$WINEPREFIX" "$WINESERVER" -k 2>/dev/null || true
+  sleep 2
+fi
+
+echo "Launching Steam (first open can take 2–5 minutes)..."
+echo ""
+echo "  • The terminal will show Wine messages — that's normal, ignore them."
+echo "  • Check your Dock for a Steam or Wine icon and click it."
+echo "  • If no window after 5 min, press Ctrl+C and run this script again."
+echo ""
+
 run_steam "$@"

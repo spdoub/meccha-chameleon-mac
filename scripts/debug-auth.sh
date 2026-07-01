@@ -43,7 +43,7 @@ export WINEDEBUG="$CHANNELS"
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-steam_api64=n,b}"
 
 set +e
-run_steam -applaunch "$APP_ID" ${GAME_FLAGS:--dx11} 2>&1 | tee -a "$LOG"
+run_game -applaunch "$APP_ID" ${GAME_FLAGS:--dx11} 2>&1 | tee -a "$LOG"
 EXIT=${PIPESTATUS[0]}
 set -e
 
