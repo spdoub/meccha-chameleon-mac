@@ -30,4 +30,4 @@ if [[ ! -f "$STEAM_EXE_UNIX" ]]; then
   exit 0
 fi
 
-exec run_steam "$@"
+run_steam "$@"
