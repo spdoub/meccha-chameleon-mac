@@ -15,25 +15,25 @@ run_in_x86 env WINEPREFIX="$WINEPREFIX" "$WINESERVER" -k 2>/dev/null || true
 sleep 2
 
 require_steam
-disable_dxmt_runtime
 
 echo "Starting Steam in background (log: $LOG)..."
+echo "CEF args: $STEAM_CEF_ARGS"
+echo ""
 
-nohup run_in_x86 env \
-  WINEPREFIX="$WINEPREFIX" \
-  WINEESYNC=1 \
-  MTL_HUD_ENABLED=0 \
-  WINEDEBUG=-all \
-  "$WINE" "$STEAM_EXE_UNIX" >>"$LOG" 2>&1 &
+{
+  echo "# Steam background launch — $(date -Iseconds)"
+  echo "# Args: $STEAM_CEF_ARGS"
+  echo ""
+} >>"$LOG"
 
+# shellcheck disable=SC2206
+nohup bash -c "source '$ROOT/scripts/common.sh' && run_steam" >>"$LOG" 2>&1 &
 STEAM_PID=$!
 disown "$STEAM_PID" 2>/dev/null || true
 
-# Wait for Steam window — try to bring it forward.
 for i in $(seq 1 30); do
   sleep 5
   if pgrep -f "steamwebhelper" >/dev/null 2>&1; then
-    # Try to focus Steam/Wine window
     osascript <<'APPLESCRIPT' 2>/dev/null || true
 tell application "System Events"
   repeat with proc in (every application process whose visible is true)
@@ -45,11 +45,11 @@ tell application "System Events"
   end repeat
 end tell
 APPLESCRIPT
-    echo "Steam is running (webhelper active after ${i}x5s)."
+    echo "Steam is running (webhelper active after $((i * 5))s)."
+    echo "Log: $LOG"
     exit 0
   fi
 done
 
 echo "Steam process started (pid $STEAM_PID) but UI may still be loading."
 echo "Check Dock for Steam/Wine icon. Log: $LOG"
-exit 0
