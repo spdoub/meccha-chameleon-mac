@@ -5,11 +5,12 @@
 
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=wine11-env.sh
+source "$ROOT/scripts/wine11-env.sh"
+
 APP_ID="${APP_ID:-4704690}"
-NOTPOP="$HOME/Games/steam-on-m1-wine"
-export WINE_APP="${WINE_APP:-$HOME/Applications/Wine Stable.app}"
-export WINE_BIN="${WINE_BIN:-$WINE_APP/Contents/Resources/wine/bin/wine}"
-export WINEPREFIX="${WINEPREFIX:-$HOME/.wine-steam}"
+NOTPOP="$NOTPOP"
 # UE5 on DXMT: windowed + avoid D3D11 single-threaded device path (steam-on-m1-wine).
 GAME_FLAGS="${GAME_FLAGS:--dx11 -force-d3d11-no-singlethreaded -screen-fullscreen 0}"
 
@@ -36,18 +37,17 @@ if [[ ! -f "$WINEMETAL_SO" ]] && [[ -x "$NOTPOP/scripts/04-install-dxmt.sh" ]]; 
   echo "DXMT not found — installing (D3D11 → Metal)..."
   bash "$NOTPOP/scripts/04-install-dxmt.sh"
 fi
-if ! nm -gU "$WINEMAC_SO" 2>/dev/null | rg -q "macdrv_view_create_metal_view"; then
+if ! nm -gU "$WINEMAC_SO" 2>/dev/null | grep -q "macdrv_view_create_metal_view"; then
   echo "Patching winemac.so for DXMT Metal views..."
   bash "$(dirname "$0")/patch-winemac.sh"
 fi
 
-# Prefer DXMT fork if installed (fixes D3D11 present-path crash on UE5).
-if [[ -x "$NOTPOP/scripts/07-build-dxmt-fork.sh" ]] \
-    && [[ ! -f "$NOTPOP/.dxmt-fork-installed" ]] \
-    && [[ ! -f "$HOME/Games/meccha-chameleon-gptk/.dxmt-fork-built" ]]; then
+# Prefer DXMT fork if not built yet.
+if [[ -x "$ROOT/scripts/build-dxmt-fork.sh" ]] && [[ ! -f "$ROOT/.dxmt-fork-built" ]]; then
   echo ""
   echo "NOTE: Game may flash and exit until the DXMT fork is built."
-  echo "      Run once (≈30–60 min): bash $NOTPOP/scripts/07-build-dxmt-fork.sh"
+  echo "      Run once (≈30–60 min): bash scripts/build-dxmt-fork.sh"
+  echo "      Or re-run: bash install.sh"
   echo ""
 fi
 

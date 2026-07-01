@@ -12,6 +12,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PROJECT_ROOT="$ROOT"
+# shellcheck source=wine11-env.sh
+source "$ROOT/scripts/wine11-env.sh"
 # shellcheck source=common.sh
 source "$ROOT/scripts/common.sh"
 

@@ -15,8 +15,8 @@ INSTALLED="$WINE_UNIX/winemac.so"
 
 export PATH="/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/flex/bin:${PATH:-}"
 
-if nm -gU "$INSTALLED" 2>/dev/null | rg -q "macdrv_view_create_metal_view"; then
-  echo "winemac.so already patched ($(nm -gU "$INSTALLED" | rg 'macdrv_' | wc -l | tr -d ' ') macdrv symbols)."
+if nm -gU "$INSTALLED" 2>/dev/null | grep -q "macdrv_view_create_metal_view"; then
+  echo "winemac.so already patched ($(nm -gU "$INSTALLED" | grep -c macdrv_ || echo 0) macdrv symbols)."
   exit 0
 fi
 
@@ -52,4 +52,4 @@ BUILT="$WINE_BUILD_SRC/build/dlls/winemac.drv/winemac.so"
 
 [[ -f "${INSTALLED}.gcenx-backup" ]] || cp "$INSTALLED" "${INSTALLED}.gcenx-backup"
 cp "$BUILT" "$INSTALLED"
-echo "Installed patched winemac.so ($(nm -gU "$INSTALLED" | rg 'macdrv_' | wc -l | tr -d ' ') macdrv symbols)"
+echo "Installed patched winemac.so ($(nm -gU "$INSTALLED" | grep -c macdrv_ || echo 0) macdrv symbols)"

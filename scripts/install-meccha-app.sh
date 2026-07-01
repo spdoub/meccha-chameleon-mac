@@ -8,8 +8,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=wine11-env.sh
+source "$ROOT/scripts/wine11-env.sh"
+
 APP_NAME="MECCHA CHAMELEON.app"
-INSTALL_DIR="${INSTALL_APP_DIR:-$HOME/Applications}"
+INSTALL_DIR="$INSTALL_APP_DIR"
 APP_PATH="$INSTALL_DIR/$APP_NAME"
 LOG_DIR="$ROOT/logs"
 
@@ -56,6 +59,9 @@ chmod +x "$APP_PATH/Contents/MacOS/launcher"
 
 echo "Installed: $APP_PATH"
 echo ""
-echo "Drag 'MECCHA CHAMELEON' from ~/Applications onto your Dock."
-echo "Requires the game installed in Steam (~/.wine-steam prefix)."
+if [[ "${1:-}" == "--pin-dock" ]] || [[ "${PIN_DOCK:-0}" == "1" ]]; then
+  bash "$ROOT/scripts/add-meccha-to-dock.sh"
+else
+  echo "Pin to Dock: bash scripts/add-meccha-to-dock.sh"
+fi
 echo "Logs: $LOG_DIR/meccha-launch.log"

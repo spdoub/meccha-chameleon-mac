@@ -6,8 +6,9 @@ set -euo pipefail
 export APP_ID="${APP_ID:-4704690}"
 export GAME_NAME="${GAME_NAME:-MECCHA CHAMELEON}"
 
-# Dedicated prefix — keeps Steam + game isolated from other Wine installs.
-export WINEPREFIX="${WINEPREFIX:-$HOME/Library/Application Support/MecchaChameleonGPTK}"
+# Active prefix — Wine 11 + Steam (notpop stack). Legacy GPTK prefix kept for old scripts.
+export WINEPREFIX="${WINEPREFIX:-$HOME/.wine-steam}"
+export WINEPREFIX_LEGACY="${WINEPREFIX_LEGACY:-$HOME/Library/Application Support/MecchaChameleonGPTK}"
 
 # Gcenx prebuilt Game Porting Toolkit (vanilla Wine + Apple D3DMetal).
 # Prefer user-local install (no admin); fall back to system /Applications.

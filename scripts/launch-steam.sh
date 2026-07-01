@@ -4,10 +4,10 @@
 
 set -euo pipefail
 
-NOTPOP="$HOME/Games/steam-on-m1-wine"
-if [[ ! -d "$NOTPOP" ]]; then
-  echo "Wine 11 Steam stack not found. Running setup..."
-  git clone --depth 1 https://github.com/notpop/steam-on-m1-wine.git "$NOTPOP"
-fi
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=wine11-env.sh
+source "$ROOT/scripts/wine11-env.sh"
+ensure_notpop
 
+export WINE_APP WINEPREFIX
 exec bash "$NOTPOP/scripts/launch-steam.sh" --detach "$@"
