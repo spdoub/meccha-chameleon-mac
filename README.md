@@ -1,0 +1,138 @@
+# MECCHA CHAMELEON on Mac (GPTK + Wine + DXMT)
+
+Free, self-hosted fix for **MECCHA CHAMELEON** (Steam AppID `4704690`) on Apple Silicon using **vanilla Wine + Apple's Game Porting Toolkit + DXMT** — no CrossOver, no Whisky, no paid software.
+
+## The problem
+
+There are two separate issues when running MECCHA CHAMELEON on Mac:
+
+### 1. Graphics: "A D3D11-compatible GPU is required"
+MECCHA CHAMELEON is Unreal Engine 5 and needs D3D11. GPTK's default **D3DMetal** doesn't properly expose D3D11 feature levels to UE5. The fix is **DXMT** — an open-source D3D11→Metal translation layer that UE5 accepts.
+
+### 2. Auth: "Failed due to invalid or missing authentication token"
+Community guides bypass the game's launcher by setting Steam launch options to point directly at `PenguinHotel-Win64-Shipping.exe`. This skips the Visual C++ prerequisite check but **breaks the Steam / Epic Online Services (EOS) auth handshake**. Online multiplayer dies.
+
+## The fix
+
+**Graphics**: Install DXMT v0.80 into the GPTK Wine environment (automated by `install.sh`).
+
+**Auth**: Launch through **Steam's process chain**, not the .exe:
+
+```bash
+steam.exe -applaunch 4704690
+```
+
+Steam stays parent of the game process, injects `steam_api64.dll`, and EOS receives a valid session token.
+
+## Requirements
+
+- Apple Silicon Mac (M-series)
+- macOS 14+ (Sonoma or later)
+- Rosetta 2 (installed automatically)
+- Homebrew (`/opt/homebrew`)
+- ~15 GB free disk (GPTK + Steam + game)
+- Windows Steam account that owns MECCHA CHAMELEON
+
+## Quick start
+
+```bash
+cd ~/Games/meccha-chameleon-gptk
+
+# Full install: GPTK + DXMT + Wine prefix + VC++/DirectX deps + Steam
+bash install.sh
+
+# Open Steam, log in, install MECCHA CHAMELEON
+bash scripts/launch-steam.sh
+
+# Clear any direct-exe launch bypass from other guides
+bash scripts/clear-launch-options.sh --fix --set "-dx11"
+
+# Play (correct launch path — keeps auth intact)
+bash scripts/launch-meccha.sh
+```
+
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `install.sh` | Full setup: GPTK 3.0-3, DXMT v0.80, Wine prefix, VC++/DirectX deps |
+| `scripts/launch-meccha.sh` | **Primary fix** — `steam.exe -applaunch 4704690 -dx11` |
+| `scripts/launch-steam.sh` | Open Windows Steam for install / updates |
+| `scripts/setup-dxmt.sh` | Install/revert DXMT (D3D11→Metal) in GPTK |
+| `scripts/clear-launch-options.sh` | Detect/remove Shipping.exe bypass in Steam VDF |
+| `scripts/fix-steam-api-overrides.sh` | Set `steam_api64=n,b` DLL override |
+| `scripts/debug-auth.sh` | Wine debug log for auth/EOS failures |
+| `cleanup.sh` | Remove everything this project installed |
+
+## Fallback workflow
+
+If applaunch alone doesn't restore multiplayer:
+
+1. **Clear bad launch options** — `bash scripts/clear-launch-options.sh --fix`
+2. **DLL overrides** — `bash scripts/fix-steam-api-overrides.sh`
+3. **Debug log** — `bash scripts/debug-auth.sh` → inspect `logs/auth-debug-*.log`
+4. **Epic link** — Ensure your Epic account is linked to the same Steam account at [epicgames.com](https://www.epicgames.com/account/connections)
+
+## Environment variables
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `WINEPREFIX` | `~/Library/Application Support/MecchaChameleonGPTK` | Isolated prefix |
+| `GAME_FLAGS` | `-dx11` | Passed after `-applaunch`; set empty to omit |
+| `SKIP_GPTK` | `0` | `1` = skip GPTK download (already installed) |
+| `SKIP_DEPS` | `0` | `1` = skip winetricks redistributables |
+| `SKIP_DXMT` | `0` | `1` = skip DXMT (use D3DMetal only) |
+| `DEBUG_CHANNELS` | see `debug-auth.sh` | WINEDEBUG filters |
+
+## How it works
+
+```
+install.sh
+  ├── Downloads GPTK 3.0-3 (Gcenx prebuild) → ~/Applications/
+  ├── Patches DXMT v0.80 into GPTK's Wine libs (D3D11→Metal)
+  ├── Creates isolated Wine prefix with Win10 registry
+  ├── Installs VC++ 2010–2022, DirectX, XInput, FAudio via winetricks
+  └── Installs Windows Steam + configures steam_api64 DLL override
+
+launch-meccha.sh
+  ├── Checks for Shipping.exe launch option bypass → removes if found
+  ├── Runs: steam.exe -applaunch 4704690 -dx11
+  │         ↑ Steam stays parent process
+  │         ↑ steam_api64.dll injected normally
+  │         ↑ EOS auth handshake completes
+  └── Game launches with working online multiplayer
+```
+
+## DXMT management
+
+GPTK 3.0-3 uses Wine 7.7 (Apple's fork). DXMT officially targets Wine 8+, so it may not fully work. GPTK's built-in **D3DMetal 3.0** already supports D3D9–D3D12 and may be sufficient. If you get a crash at launch, revert DXMT and try D3DMetal alone:
+
+```bash
+# Revert to D3DMetal
+bash scripts/setup-dxmt.sh --undo
+
+# Re-install DXMT
+bash scripts/setup-dxmt.sh
+```
+
+## What not to do
+
+- Do **not** set Steam launch options to `PenguinHotel-Win64-Shipping.exe`
+- Do **not** use `whisky run … Shipping.exe` or a desktop shortcut to the .exe
+- Do **not** launch the game outside of Steam's process tree
+- Do **not** expect native macOS Steam to auth the Windows game binary
+
+## Credits
+
+- [Gcenx](https://github.com/Gcenx/game-porting-toolkit) — GPTK prebuilds
+- [3Shain/dxmt](https://github.com/3Shain/dxmt) — D3D11→Metal translation
+- [feiyuehchen/Meccha-Chameleon-For-MAC](https://github.com/feiyuehchen/Meccha-Chameleon-For-MAC) — Whisky-based setup reference
+- [nothinglo/meccha-chameleon-mac](https://github.com/nothinglo/meccha-chameleon-mac) — Sikarugir-based setup reference
+
+## Logs
+
+Install and debug logs: `~/Games/meccha-chameleon-gptk/logs/`
+
+## License
+
+Scripts: MIT. GPTK: Apple license. DXMT: MIT/LGPL. Steam / game: Valve / developer terms.
