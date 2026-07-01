@@ -1,56 +1,13 @@
 #!/usr/bin/env bash
-# Start Windows Steam inside the GPTK prefix (for installing the game).
+# Launch Steam via the working Wine 11 stack (notpop/steam-on-m1-wine).
+# GPTK Wine 7.7 cannot boot modern Steam — this path uses Wine 11 + CEF wrapper.
 
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export PROJECT_ROOT="$ROOT"
-# shellcheck source=common.sh
-source "$ROOT/scripts/common.sh"
 
-STEAM_LOG="$LOG_DIR/steam-launch.log"
-
-echo "==> Starting Windows Steam"
-echo "    Prefix: $WINEPREFIX"
-echo ""
-
-SETUP="$HOME/Downloads/SteamSetup.exe"
-
-if [[ ! -f "$STEAM_EXE_UNIX" ]]; then
-  if [[ ! -f "$SETUP" ]]; then
-    echo "Downloading Windows Steam installer to ~/Downloads..."
-    curl -fL "https://cdn.akamai.steamstatic.com/client/installer/SteamSetup.exe" \
-      -o "$SETUP" || {
-      echo "Download failed. Manually download from:" >&2
-      echo "  https://store.steampowered.com/about/download" >&2
-      echo "Save the Windows installer as ~/Downloads/SteamSetup.exe" >&2
-      exit 1
-    }
-  fi
-  echo "Steam not installed — running SteamSetup.exe..."
-  echo "Follow the installer prompts in the window that appears."
-  run_wine "$SETUP"
-  exit 0
+NOTPOP="$HOME/Games/steam-on-m1-wine"
+if [[ ! -d "$NOTPOP" ]]; then
+  echo "Wine 11 Steam stack not found. Running setup..."
+  git clone --depth 1 https://github.com/notpop/steam-on-m1-wine.git "$NOTPOP"
 fi
 
-# Kill any stuck Steam from a previous crash-loop.
-if pgrep -f "steam.exe" >/dev/null 2>&1; then
-  echo "Stopping previous Steam instance..."
-  pkill -f "steam.exe|steamwebhelper" 2>/dev/null || true
-  run_in_x86 env WINEPREFIX="$WINEPREFIX" "$WINESERVER" -k 2>/dev/null || true
-  sleep 2
-fi
-
-echo "Launching Steam (first open can take 2–5 minutes)..."
-echo ""
-echo "  • Wine debug output goes to: $STEAM_LOG"
-echo "  • Check your Dock for a Steam or Wine icon and click it."
-echo "  • If no window after 5 min, press Ctrl+C and run this script again."
-echo ""
-
-{
-  echo "# Steam launch — $(date -Iseconds)"
-  echo "# Args: $STEAM_CEF_ARGS"
-  echo ""
-} >>"$STEAM_LOG"
-
-run_steam "$@" >>"$STEAM_LOG" 2>&1
+exec bash "$NOTPOP/scripts/launch-steam.sh" --detach "$@"

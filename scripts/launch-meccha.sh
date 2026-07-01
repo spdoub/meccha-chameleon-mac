@@ -1,60 +1,45 @@
 #!/usr/bin/env bash
 #
-# Primary fix: launch MECCHA CHAMELEON through Steam's process chain so the
-# Steam + Epic Online Services auth handshake completes (required for online play).
-#
-# Do NOT launch PenguinHotel-Win64-Shipping.exe directly — that bypasses Steam/EOS
-# and produces "invalid or missing authentication token for user".
-#
-# Usage:
-#   bash scripts/launch-meccha.sh
-#   GAME_FLAGS="-dx11 -windowed" bash scripts/launch-meccha.sh
+# Launch MECCHA CHAMELEON via Steam applaunch on the Wine 11 stack.
+# Uses ~/.wine-steam prefix (Wine 11 + CEF wrapper — actually boots Steam).
 
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export PROJECT_ROOT="$ROOT"
-# shellcheck source=common.sh
-source "$ROOT/scripts/common.sh"
 
-echo "==> MECCHA CHAMELEON — Steam applaunch (AppID $APP_ID)"
-echo "    Prefix: $WINEPREFIX"
-[[ "$DXMT_INSTALLED" == "1" ]] && echo "    Graphics: DXMT (D3D11→Metal)" || echo "    Graphics: D3DMetal"
-echo ""
+APP_ID="${APP_ID:-4704690}"
+NOTPOP="$HOME/Games/steam-on-m1-wine"
+export WINE_APP="${WINE_APP:-$HOME/Applications/Wine Stable.app}"
+export WINE_BIN="${WINE_BIN:-$WINE_APP/Contents/Resources/wine/bin/wine}"
+export WINEPREFIX="${WINEPREFIX:-$HOME/.wine-steam}"
+GAME_FLAGS="${GAME_FLAGS:--dx11}"
 
-require_steam
+STEAM_EXE="$WINEPREFIX/drive_c/Program Files (x86)/Steam/Steam.exe"
+GAME_EXE="$WINEPREFIX/drive_c/Program Files (x86)/Steam/steamapps/common/MECCHA CHAMELEON/Chameleon/Binaries/Win64/PenguinHotel-Win64-Shipping.exe"
 
-if ! game_installed; then
-  echo "Game binaries not found yet at:"
-  echo "  $GAME_EXE_UNIX"
-  echo ""
-  echo "Install MECCHA CHAMELEON from Windows Steam first, then re-run this script."
-  echo "You can open Steam with: bash scripts/launch-steam.sh"
+if [[ ! -f "$STEAM_EXE" ]]; then
+  echo "Steam not ready — launching Steam first..."
+  bash "$(dirname "$0")/launch-steam.sh"
+  sleep 30
+fi
+
+if [[ ! -f "$GAME_EXE" ]]; then
+  echo "MECCHA CHAMELEON not installed yet."
+  echo "Steam should be open — log in and install the game, then run this again."
+  open "$HOME/Applications/Steam on M1 Wine.app" 2>/dev/null || bash "$(dirname "$0")/launch-steam.sh"
   exit 1
 fi
 
-# Warn if someone left a direct-exe bypass in Steam launch options.
-if bash "$ROOT/scripts/clear-launch-options.sh" --check-only 2>/dev/null | grep -q "DIRECT_EXE_BYPASS"; then
-  echo "WARNING: Steam launch options bypass the launcher with Shipping.exe."
-  echo "That breaks EOS auth. Clearing them now..."
-  bash "$ROOT/scripts/clear-launch-options.sh" --fix
-  echo ""
+# Ensure wrapper is deployed.
+if [[ -x "$NOTPOP/scripts/06-install-wrapper.sh" ]]; then
+  bash "$NOTPOP/scripts/06-install-wrapper.sh" >/dev/null 2>&1 || true
 fi
 
-STEAM_ARGS=( -applaunch "$APP_ID" )
+export WINEDLLOVERRIDES="dxgi,d3d11,d3d10core=n,b;bcrypt=b;ncrypt=b;gameoverlayrenderer,gameoverlayrenderer64=d;steam_api64=n,b"
 
-# Game flags passed after -applaunch (still inside Steam's chain).
-# UE5 on GPTK/DXMT usually needs -dx11.
-GAME_FLAGS="${GAME_FLAGS:--dx11}"
-if [[ -n "$GAME_FLAGS" ]]; then
-  # shellcheck disable=SC2206
-  STEAM_ARGS+=( $GAME_FLAGS )
-fi
+echo "Launching MECCHA CHAMELEON via steam.exe -applaunch $APP_ID $GAME_FLAGS"
 
-echo "Launch command:"
-echo "  steam.exe ${STEAM_ARGS[*]}"
-echo ""
-echo "Steam will start (if not running), authenticate, then spawn the game."
-echo "First launch can take several minutes under Rosetta + Wine."
-echo ""
-
-run_game "${STEAM_ARGS[@]}"
+cd "$WINEPREFIX/drive_c/Program Files (x86)/Steam"
+exec /usr/bin/arch -x86_64 env WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all WINEDLLOVERRIDES="$WINEDLLOVERRIDES" \
+  "$WINE_BIN" explorer.exe "/desktop=steam-on-m1-wine,1470x956" \
+  "C:\\Program Files (x86)\\Steam\\Steam.exe" \
+  -applaunch "$APP_ID" $GAME_FLAGS \
+  -no-cef-sandbox -cef-single-process -noverifyfiles
