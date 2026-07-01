@@ -49,5 +49,11 @@ with open(plist_path, "wb") as f:
 PY
 
 killall Dock 2>/dev/null || true
+
+# One clean Dock icon — remove separate Steam/Wine tiles.
+# shellcheck source=meccha-common.sh
+source "$ROOT/scripts/meccha-common.sh"
+meccha_remove_steam_from_dock
+
 echo "Pinned MECCHA CHAMELEON to the Dock (persists after quit)."
 open -R "$APP"

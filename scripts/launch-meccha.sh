@@ -1,119 +1,107 @@
 #!/usr/bin/env bash
 #
-# Launch MECCHA CHAMELEON via Steam applaunch on the Wine 11 stack.
-# Uses ~/.wine-steam prefix (Wine 11 + CEF wrapper — actually boots Steam).
+# Launch MECCHA CHAMELEON — one virtual-desktop window, silent Steam, game via applaunch.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=wine11-env.sh
 source "$ROOT/scripts/wine11-env.sh"
+# shellcheck source=meccha-common.sh
+source "$ROOT/scripts/meccha-common.sh"
 
 APP_ID="${APP_ID:-4704690}"
 NOTPOP="$NOTPOP"
-
-# Recover from idle weeks, Wine upgrades, stale locks, broken WoW64.
-bash "$ROOT/scripts/preflight-launch.sh"
-# UE5 on DXMT: windowed + avoid D3D11 single-threaded device path (steam-on-m1-wine).
-GAME_FLAGS="${GAME_FLAGS:--dx11 -force-d3d11-no-singlethreaded -screen-fullscreen 0}"
-
-STEAM_EXE="$WINEPREFIX/drive_c/Program Files (x86)/Steam/Steam.exe"
 STEAM_DIR="$WINEPREFIX/drive_c/Program Files (x86)/Steam"
 GAME_EXE="$STEAM_DIR/steamapps/common/MECCHA CHAMELEON/Chameleon/Binaries/Win64/PenguinHotel-Win64-Shipping.exe"
+LOG_FILE="${LOG_DIR}/meccha-launch.log"
+VD_NAME="${WINE_VIRTUAL_DESKTOP_NAME:-MECCHA CHAMELEON}"
 
+mkdir -p "$LOG_DIR"
+exec >>"$LOG_FILE" 2>&1
+
+meccha_notify "MECCHA CHAMELEON" "Starting…"
+
+bash "$ROOT/scripts/preflight-launch.sh"
+
+GAME_FLAGS="$(meccha_build_game_flags)"
+export WINEESYNC=0 WINEFSYNC=0
+export WINEDLLOVERRIDES="dxgi,d3d11,d3d10core=n,b;bcrypt=b;ncrypt=b;gameoverlayrenderer,gameoverlayrenderer64=d;steam_api64=n,b"
+export MTL_HUD_ENABLED="${MECCHA_HUD:-${MTL_HUD_ENABLED:-0}}"
+
+# Game not installed — open Steam UI once (only path that needs a second app).
 if [[ ! -f "$GAME_EXE" ]]; then
-  echo "MECCHA CHAMELEON not installed yet — open Steam and install it first."
-  open "$HOME/Applications/Steam on M1 Wine.app" 2>/dev/null \
-    || bash "$(dirname "$0")/launch-steam.sh"
+  meccha_notify "MECCHA CHAMELEON" "Install the game in Steam first"
+  open "$INSTALL_APP_DIR/Steam on M1 Wine.app" 2>/dev/null || bash "$ROOT/scripts/launch-steam.sh"
   exit 1
 fi
 
-# DXMT (D3D11→Metal) — first-time install only; preflight handles rebuild after upgrades.
-WINEMETAL_SO="$WINE_APP/Contents/Resources/wine/lib/wine/x86_64-unix/winemetal.so"
-WINEMAC_SO="$WINE_APP/Contents/Resources/wine/lib/wine/x86_64-unix/winemac.so"
-if [[ ! -f "$WINEMETAL_SO" ]] && [[ -x "$NOTPOP/scripts/04-install-dxmt.sh" ]]; then
-  echo "DXMT not found — installing (D3D11 → Metal)..."
-  bash "$NOTPOP/scripts/04-install-dxmt.sh"
-fi
-if ! nm -gU "$WINEMAC_SO" 2>/dev/null | grep -q "macdrv_view_create_metal_view"; then
-  echo "Patching winemac.so for DXMT Metal views..."
-  bash "$(dirname "$0")/patch-winemac.sh"
-fi
-
-# Prefer DXMT fork if not built yet.
-if [[ -x "$ROOT/scripts/build-dxmt-fork.sh" ]] && [[ ! -f "$ROOT/.dxmt-fork-built" ]]; then
-  echo ""
-  echo "NOTE: Game may flash and exit until the DXMT fork is built."
-  echo "      Run once (≈30–60 min): bash scripts/build-dxmt-fork.sh"
-  echo "      Or re-run: bash install.sh"
-  echo ""
-fi
-
-export WINEESYNC=0
-export WINEFSYNC=0
-export WINEDLLOVERRIDES="dxgi,d3d11,d3d10core=n,b;bcrypt=b;ncrypt=b;gameoverlayrenderer,gameoverlayrenderer64=d;steam_api64=n,b"
-
-# Stale / duplicate Steam sessions leave applaunch hanging with no window.
+# Prefix-scoped shutdown (does not touch other Wine installs).
 if [[ "${MECCHA_NO_KILL:-0}" != "1" ]]; then
-  patterns='steam\.exe|steamwebhelper|steamservice|wineserver|wine64-preloader|winedevice|explorer\.exe'
-  to_kill=$(pgrep -f "$patterns" 2>/dev/null || true)
-  if [[ -n "$to_kill" ]]; then
-    echo "Stopping stale Wine/Steam processes..."
-    # shellcheck disable=SC2086
-    kill -9 $to_kill 2>/dev/null || true
-    sleep 2
-  fi
+  echo "Stopping previous session for $WINEPREFIX..."
+  meccha_kill_prefix "$WINEPREFIX" "$WINESERVER"
 fi
 
-steam_running() {
-  pgrep -f "Steam/Steam.exe|Steam\\\\Steam.exe" >/dev/null 2>&1 \
-    || pgrep -f "Steam.exe" >/dev/null 2>&1
-}
+# Deploy wrapper + scrub locks (launch-steam does this too; keep in sync).
+bash "$NOTPOP/scripts/06-install-wrapper.sh" >/dev/null 2>&1 || true
 
-if ! steam_running; then
-  echo "Starting Steam (Wine 11 + virtual desktop)..."
-else
-  echo "Restarting Steam for a clean game launch..."
-fi
-bash "$NOTPOP/scripts/launch-steam.sh" --detach
-for _ in $(seq 1 45); do
-  steam_running && break
-  sleep 2
-done
-steam_running || { echo "Steam did not start — check ~/Applications/Steam on M1 Wine.app" >&2; exit 1; }
-sleep 8
+VD_SIZE="$(meccha_detect_display_size)"
+STEAM_ARGS=(-no-cef-sandbox -cef-single-process -noverifyfiles -silent)
 
-echo "Launching MECCHA CHAMELEON via steam.exe -applaunch $APP_ID"
-echo "  Game flags: $GAME_FLAGS"
+echo "Launching single-window session ($VD_NAME @ $VD_SIZE)"
+meccha_notify "MECCHA CHAMELEON" "Launching game…"
 
 cd "$STEAM_DIR"
-# IMPORTANT: Do NOT pass -cef-* / -noverifyfiles here — Steam forwards them to the game
-# and UE5 aborts (see crash CommandLine in AppData/Local/Chameleon/Saved/Crashes).
 /usr/bin/arch -x86_64 env \
   WINEPREFIX="$WINEPREFIX" \
   WINEESYNC=0 \
   WINEFSYNC=0 \
   WINEDEBUG="${WINEDEBUG:--all}" \
   WINEDLLOVERRIDES="$WINEDLLOVERRIDES" \
-  "$WINE_BIN" "C:\\Program Files (x86)\\Steam\\Steam.exe" \
-  -applaunch "$APP_ID" $GAME_FLAGS
+  MTL_HUD_ENABLED="$MTL_HUD_ENABLED" \
+  "$WINE_BIN" explorer.exe \
+  "/desktop=${VD_NAME},${VD_SIZE}" \
+  "C:\\Program Files (x86)\\Steam\\Steam.exe" \
+  "${STEAM_ARGS[@]}" \
+  -applaunch "$APP_ID" $GAME_FLAGS &
 
-# Applaunch returns once Steam accepts the job; focus the Wine desktop window.
-for _ in $(seq 1 30); do
-  pgrep -f 'PenguinHotel-Win64-Shipping' >/dev/null 2>&1 && break
-  sleep 1
+LAUNCH_PID=$!
+
+# Wait for game process (retry once on failure).
+game_up() { /usr/bin/pgrep -f 'PenguinHotel-Win64-Shipping' >/dev/null 2>&1; }
+
+for attempt in 1 2; do
+  for _ in $(seq 1 45); do
+    game_up && break
+    sleep 1
+  done
+  game_up && break
+  if [[ "$attempt" == 1 ]]; then
+    echo "Game did not appear — retrying launch (attempt 2)..."
+    meccha_notify "MECCHA CHAMELEON" "Retrying launch…"
+    meccha_kill_prefix "$WINEPREFIX" "$WINESERVER"
+    sleep 2
+    /usr/bin/arch -x86_64 env \
+      WINEPREFIX="$WINEPREFIX" WINEESYNC=0 WINEFSYNC=0 \
+      WINEDEBUG="${WINEDEBUG:--all}" WINEDLLOVERRIDES="$WINEDLLOVERRIDES" \
+      MTL_HUD_ENABLED="$MTL_HUD_ENABLED" \
+      "$WINE_BIN" explorer.exe \
+      "/desktop=${VD_NAME},${VD_SIZE}" \
+      "C:\\Program Files (x86)\\Steam\\Steam.exe" \
+      "${STEAM_ARGS[@]}" \
+      -applaunch "$APP_ID" $GAME_FLAGS &
+    LAUNCH_PID=$!
+  fi
 done
-/usr/bin/osascript <<'APPLESCRIPT' 2>/dev/null || true
-tell application "System Events"
-  repeat with p in (every process whose name contains "wine")
-    try
-      set frontmost of p to true
-      repeat with w in (every window of p)
-        try
-          perform action "AXRaise" of w
-        end try
-      end repeat
-    end try
-  end repeat
-end tell
-APPLESCRIPT
+
+if game_up; then
+  meccha_focus_wine
+  meccha_notify "MECCHA CHAMELEON" "Ready — check the game window"
+  echo "Game running (pid $LAUNCH_PID)"
+  exit 0
+fi
+
+echo "ERROR: Game did not start within timeout"
+meccha_report_crash "$LOG_FILE"
+meccha_notify "MECCHA CHAMELEON" "Launch failed — run: bash scripts/doctor.sh"
+exit 1

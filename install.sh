@@ -103,28 +103,40 @@ if [[ "${SKIP_STEAM:-0}" != "1" ]]; then
   bash "$ROOT/scripts/install-prefix-deps.sh"
 fi
 
-# --- 5. macOS apps + Dock ---
-step "macOS launcher apps"
+# --- 5. macOS app + Dock (one icon only) ---
+step "macOS launcher app"
 bash "$NOTPOP/scripts/09-install-macos-app.sh" || true
 PIN_DOCK=1 bash "$ROOT/scripts/install-meccha-app.sh"
-if [[ "${SKIP_DOCK:-0}" != "1" ]]; then
-  bash "$NOTPOP/scripts/10-add-to-dock.sh" 2>/dev/null || true
+
+# Record known-good Wine version; optional pin to survive brew upgrade.
+WINE_VER=$(arch -x86_64 "$WINE_BIN" --version 2>/dev/null | head -n1 || echo unknown)
+echo "$WINE_VER" > "$ROOT/.known-wine-version"
+if brew list --cask wine-stable >/dev/null 2>&1; then
+  brew pin wine-stable 2>/dev/null && ok "Pinned wine-stable cask" || ok "Wine version recorded ($WINE_VER)"
+else
+  ok "Wine version recorded ($WINE_VER)"
 fi
 
 # --- Done ---
 step "Install complete"
 cat <<EOF
 
-Next steps on this Mac:
-  1. Open "Steam on M1 Wine" from ~/Applications (or Dock)
-  2. Log in and install MECCHA CHAMELEON from your library
-  3. Click "MECCHA CHAMELEON" in the Dock to play
+Next steps:
+  1. Click **MECCHA CHAMELEON** in the Dock (only icon you need)
+  2. First time only: if the game isn't installed, Steam opens — log in and install it
+  3. After that, one click launches the game in a single window
 
-Launch manually:
-  bash scripts/launch-meccha.sh
+Other Mac:
+  bash scripts/bootstrap-mac.sh ~/Downloads/wine-steam.tgz
+
+Health check:
+  bash scripts/doctor.sh
+
+Launch options:
+  MECCHA_HUD=1 bash scripts/launch-meccha.sh          # FPS overlay
+  MECCHA_FULLSCREEN=1 bash scripts/launch-meccha.sh   # fullscreen
 
 Logs: $LOG_DIR/
 Prefix: $WINEPREFIX
-Wine:   $WINE_APP
 
 EOF

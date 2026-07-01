@@ -73,3 +73,7 @@ if [[ -f "$ROOT/.dxmt-fork-built" ]]; then
     bash "$ROOT/scripts/build-dxmt-fork.sh"
   fi
 fi
+
+# shellcheck source=meccha-common.sh
+source "$ROOT/scripts/meccha-common.sh"
+meccha_check_wine_version || true

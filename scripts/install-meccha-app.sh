@@ -81,6 +81,10 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>LSUIElement</key>
+    <true/>
+    <key>LSMultipleInstancesProhibited</key>
+    <true/>
 $( [[ -n "$HAS_ICON" ]] && printf '    <key>CFBundleIconFile</key>\n    <string>AppIcon</string>\n    <key>CFBundleIconName</key>\n    <string>AppIcon</string>\n' )
 </dict>
 </plist>
@@ -100,9 +104,12 @@ ROOT="$ROOT"
 LOG="$LOG_DIR/meccha-launch.log"
 mkdir -p "$LOG_DIR"
 
-# Run in background so the .app returns immediately (Dock bounce) while launch continues.
+# Run in background so the .app returns immediately while launch continues.
 (
   printf '\n== %s via MECCHA CHAMELEON.app ==\n' "\$(/bin/date '+%F %T')"
+  export MECCHA_HUD="\${MECCHA_HUD:-0}"
+  export MECCHA_FULLSCREEN="\${MECCHA_FULLSCREEN:-0}"
+  /usr/bin/osascript -e 'display notification "Starting…" with title "MECCHA CHAMELEON"' 2>/dev/null || true
   /bin/bash "\$ROOT/scripts/launch-meccha.sh"
 ) >>"\$LOG" 2>&1 &
 disown
